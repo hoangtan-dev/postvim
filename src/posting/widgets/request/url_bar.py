@@ -179,8 +179,33 @@ class UrlBar(Vertical):
         self._trace_events: set[Event] = set()
 
     def on_env_changed(self, _: None) -> None:
+        self._update_environment_label()
         self._display_variable_at_cursor()
         self.url_input.refresh()
+
+    def _update_environment_label(self) -> None:
+        label = self.environment_label
+        environment_files = self.app.environment_files
+        theme = self.app.current_theme
+        names = (
+            " + ".join(path.name for path in environment_files)
+            if environment_files
+            else "none"
+        )
+        accent_color = theme.accent or theme.foreground or "white"
+        filename_color = theme.foreground or "#FFFFFF"
+        filename_background = theme.surface or theme.background or "black"
+        label.update(
+            Text.assemble(
+                ("ENV", f"bold {accent_color}"),
+                " ",
+                (f" {names} ", f"{filename_color} on {filename_background}"),
+            )
+        )
+        if environment_files:
+            label.tooltip = "\n".join(str(path) for path in environment_files)
+        else:
+            label.tooltip = "No environment file loaded"
 
     def watch_response_status_code(self, status_code: int | None) -> None:
         if status_code is None:
@@ -215,10 +240,11 @@ class UrlBar(Vertical):
             yield Label(id="trace-markers")
             yield SendRequestButton("Send")
 
-        variable_value_bar = Label(id="variable-value-bar")
+        with Horizontal(id="metadata-row"):
+            yield Label(id="environment-label")
+            variable_value_bar = Label(id="variable-value-bar")
         if not SETTINGS.get().url_bar.show_value_preview:
             variable_value_bar.styles.display = "none"
-        yield variable_value_bar
 
     def on_mount(self) -> None:
         self.auto_complete = VariableAutoComplete(
@@ -229,6 +255,7 @@ class UrlBar(Vertical):
         self.screen.mount(self.auto_complete)
 
         self.on_theme_change(self.app.current_theme)
+        self._update_environment_label()
         self.app.theme_changed_signal.subscribe(self, self.on_theme_change)
         self.app.env_changed_signal.subscribe(self, self.on_env_changed)
 
@@ -291,6 +318,7 @@ class UrlBar(Vertical):
         return [DropdownItem(main=f"${variable}") for variable in get_variables()]
 
     def on_theme_change(self, theme: Theme) -> None:
+        self._update_environment_label()
         markers = self._build_markers()
         self.trace_markers.update(markers)
         self.url_input.notify_style_update()
@@ -347,6 +375,11 @@ class UrlBar(Vertical):
     def variable_value_bar(self) -> Label:
         """Get the variable value bar."""
         return self.query_one("#variable-value-bar", Label)
+
+    @property
+    def environment_label(self) -> Label:
+        """Get the current environment label."""
+        return self.query_one("#environment-label", Label)
 
     @property
     def url_input(self) -> UrlInput:

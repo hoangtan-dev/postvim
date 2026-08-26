@@ -448,6 +448,19 @@ UrlBar {
       text-align: center;
       height: 1;
   }
+  & #metadata-row {
+      height: 2;
+      width: 1fr;
+      border-top: solid $surface-lighten-1 30%;
+  }
+  & #environment-label {
+      width: auto;
+      color: $text-accent;
+      background: $accent-muted;
+      padding: 0 1;
+      text-style: bold;
+      content-align: center middle;
+  }
   & .complete-marker {
       color: $success;
       background: $surface;
