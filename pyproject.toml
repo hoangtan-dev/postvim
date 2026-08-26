@@ -19,8 +19,9 @@ dependencies = [
     "python-dotenv>=1.0.1,<2.0.0",
     # pinned intentionally
     "watchfiles>=0.24.0",
-    "textual[syntax]==6.1.0",
+    "textual[syntax]>=8.2,<9.0.0",
     "textual-autocomplete==4.0.6",
+    "textual-tty==0.4.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.11"

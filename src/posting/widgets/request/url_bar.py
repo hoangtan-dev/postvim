@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 import os
 import re
-import shlex
-import subprocess
 import tempfile
 from typing import Any
 from rich.text import Text
@@ -18,6 +16,7 @@ from textual.widgets import Input, Button, Label
 from textual.theme import Theme
 from textual.widgets.input import Selection
 from textual_autocomplete import DropdownItem, TargetState
+from textual_tty import Terminal
 from posting.config import SETTINGS
 from posting.help_data import HelpData
 
@@ -31,6 +30,7 @@ from posting.variables import (
 from posting.widgets.input import PostingInput
 from posting.widgets.request.method_selection import MethodSelector
 from posting.widgets.response.response_trace import Event
+from posting.widgets.terminal import TransparentTerminalWindow
 from posting.widgets.variable_autocomplete import VariableAutoComplete
 
 
@@ -38,6 +38,90 @@ class CurlMessage(Message):
     def __init__(self, curl_command: str) -> None:
         super().__init__()
         self.curl_command = curl_command
+
+
+class UrlEditorWindow(TransparentTerminalWindow):
+    """A floating Neovim editor for a URL input."""
+
+    NVIM_APPNAME = "posting"
+
+    DEFAULT_CSS = """
+    UrlEditorWindow {
+        width: 120;
+        height: 3;
+        background: transparent;
+        border: none;
+    }
+
+    UrlEditorWindow:focus-within {
+        background: transparent;
+    }
+
+    UrlEditorWindow > #header {
+        height: 1;
+        background: #01050a;
+        color: $foreground-muted;
+    }
+
+    UrlEditorWindow:focus-within > #header {
+        background: #01050a;
+    }
+
+    UrlEditorWindow > #header > TitleBar {
+        content-align: center middle;
+        padding: 0 1;
+        color: #c4b5fd;
+    }
+
+    UrlEditorWindow > #header > CloseButton {
+        color: $foreground-muted;
+        background: transparent;
+        content-align: center middle;
+    }
+
+    UrlEditorWindow > #header > CloseButton:hover {
+        background: $error 70%;
+    }
+
+    UrlEditorWindow > #content,
+    UrlEditorWindow > #footer,
+    UrlEditorWindow > #content > TransparentTerminal {
+        background: transparent;
+    }
+
+    UrlEditorWindow > #footer {
+        display: none;
+    }
+    """
+
+    def __init__(self, url_input: "UrlInput", file_name: str) -> None:
+        self.url_input = url_input
+        self.file_name = file_name
+        self._result_read = False
+        super().__init__(
+            command=["env", f"NVIM_APPNAME={self.NVIM_APPNAME}", "nvim", file_name],
+            title="Edit URL",
+            return_focus=url_input,
+            starting_horizontal="center",
+            starting_vertical="middle",
+        )
+
+    def on_terminal_process_exited(self, message: Terminal.ProcessExited) -> None:
+        if message.exit_code == 0 and not self._result_read:
+            with open(self.file_name, encoding="utf-8") as file:
+                self.url_input.value = file.read().rstrip("\n")
+            self.url_input.app.refresh()
+            self._result_read = True
+        elif message.exit_code != 0:
+            self.url_input.app.notify(
+                f"Neovim exited with status {message.exit_code}.", severity="error"
+            )
+        super().on_terminal_process_exited(message)
+
+    def on_unmount(self) -> None:
+        super().on_unmount()
+        if os.path.exists(self.file_name):
+            os.remove(self.file_name)
 
 
 class UrlInput(PostingInput):
@@ -148,41 +232,14 @@ It's recommended you create a new request before pasting a curl command, to avoi
             self.notify(f"Copied URL to clipboard: {url}")
 
     def action_open_in_editor(self) -> None:
-        """Open the URL in the configured external editor."""
-        editor_command = SETTINGS.get().editor
-        if not editor_command:
-            self.app.notify(
-                severity="warning",
-                title="No editor configured",
-                message="Set the [b]$EDITOR[/b] environment variable.",
-            )
-            return
-
-        editor_args = shlex.split(editor_command)
+        """Open the URL in a floating Neovim window."""
         with tempfile.NamedTemporaryFile(
             suffix=".url", mode="w", encoding="utf-8", delete=False
         ) as temp_file:
             temp_file_name = temp_file.name
             temp_file.write(self.value)
 
-        editor_args.append(temp_file_name)
-        try:
-            with self.app.suspend():
-                try:
-                    subprocess.call(editor_args)
-                except OSError:
-                    self.app.notify(
-                        severity="error",
-                        title="Can't run command",
-                        message=f"The command [b]{editor_command}[/b] failed to run.",
-                    )
-                    return
-
-            with open(temp_file_name, encoding="utf-8") as temp_file:
-                self.value = temp_file.read().rstrip("\n")
-            self.app.refresh()
-        finally:
-            os.remove(temp_file_name)
+        self.app.mount(UrlEditorWindow(self, temp_file_name))
 
 
 class SendRequestButton(Button, can_focus=False):

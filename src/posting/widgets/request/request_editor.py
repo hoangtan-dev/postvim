@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, cast
 from rich.text import Text
 from textual import on, log
+from textual.binding import Binding
 from textual.css.query import NoMatches
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -12,7 +13,7 @@ from posting.widgets.request.form_editor import FormEditor
 from posting.widgets.request.header_editor import HeaderEditor
 from posting.widgets.request.query_editor import QueryStringEditor
 from posting.widgets.request.request_auth import RequestAuth
-from posting.widgets.request.request_body import RequestBodyEditor
+from posting.widgets.request.request_body import RequestBodyEditor, RequestBodyTextArea
 from posting.widgets.request.request_metadata import RequestMetadata
 from posting.widgets.request.request_options import RequestOptions
 from posting.widgets.request.request_scripts import RequestScripts
@@ -27,7 +28,26 @@ if TYPE_CHECKING:
 
 
 class RequestEditorTabbedContent(PostingTabbedContent):
-    pass
+    BINDINGS = [
+        Binding("ctrl+e", "open_body_in_editor", "Editor", show=False),
+    ]
+
+    def action_open_body_in_editor(self) -> None:
+        if self.active != "body-pane":
+            return
+
+        try:
+            body_editor = self.query_one("#body-pane RequestBodyEditor", RequestBodyEditor)
+            content_switcher = body_editor.query_one(
+                "#request-body-type-content-switcher", ContentSwitcher
+            )
+            if content_switcher.current != "text-body-editor":
+                return
+            text_area = body_editor.query_one(RequestBodyTextArea)
+        except NoMatches:
+            return
+
+        text_area.action_open_in_editor()
 
 
 class RequestEditor(Vertical):
