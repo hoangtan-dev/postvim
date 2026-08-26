@@ -66,7 +66,7 @@ The only way to know for sure which keys are supported in your particular termin
 
 These are the IDs of the actions that you can change the keybinding for:
 
-- `send-request` - Send the current request. Default: `ctrl+j,alt+enter`.
+- `send-request` - Send the current request. Default: `alt+enter`.
 - `focus-method` - Focus the method selector. Default: `ctrl+t`.
 - `focus-url` - Focus the URL input. Default: `ctrl+l`.
 - `save-request` - Save the current request. Default: `ctrl+s`.
@@ -78,5 +78,5 @@ These are the IDs of the actions that you can change the keybinding for:
 - `quit` - Quit the application. Default: `ctrl+c`.
 - `jump` - Enter jump mode. Default: `ctrl+o`.
 - `open-in-pager` - Open the content of the focused text area in your $PAGER/$POSTING_PAGER/$POSTING_PAGER_JSON. Default: `f3`.
-- `open-in-editor` - Open the content of the focused text area in your $EDITOR/$POSTING_EDITOR. Default: `f4`.
+- `open-in-editor` - Open the content of the focused text area in your $EDITOR/$POSTING_EDITOR. Default: `ctrl+e`.
 - `search-requests` - Go to a request by name. Default: `ctrl+shift+p`.

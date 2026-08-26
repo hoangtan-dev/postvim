@@ -8,7 +8,7 @@ You can even configure a custom pager specifically for browsing JSON.
 
 ## External Editors
 
-With a multi-line text area focused, press ++f4++ to open the file in your
+With a multi-line text area focused, press ++ctrl+e++ to open the file in your
 configured external editor.
 
 The configured external editor can be set as `editor` in your `config.yaml`
@@ -89,4 +89,3 @@ producing a command like the following:
 ```bash
 curl --verbose -w %{time_total} %{http_code} -X POST ...
 ```
-

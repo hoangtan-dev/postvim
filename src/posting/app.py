@@ -31,7 +31,7 @@ from textual.signal import Signal
 from textual.theme import Theme, BUILTIN_THEMES as TEXTUAL_THEMES
 from textual.widget import AwaitMount, Widget
 from textual.widgets.input import Selection
-from textual.widgets import Button, Footer, Input, Label, Tab, Tabs
+from textual.widgets import Button, Input, Label, Tab, Tabs
 from textual.widgets.tabbed_content import ContentTab
 from posting.collection import (
     Collection,
@@ -114,7 +114,7 @@ class MainScreen(Screen[None]):
     BINDING_GROUP_TITLE = "Main Screen"
     BINDINGS = [
         Binding(
-            "ctrl+j,alt+enter",
+            "alt+enter",
             "send_request",
             "Send",
             tooltip="Send the current request.",
@@ -235,8 +235,8 @@ class MainScreen(Screen[None]):
                 "method-selector": "1",
                 "url-input": "2",
                 "collection-tree": "tab",
-                "--content-tab-headers-pane": "q",
-                "--content-tab-body-pane": "w",
+                "--content-tab-body-pane": "q",
+                "--content-tab-headers-pane": "w",
                 "--content-tab-path-pane": "e",
                 "--content-tab-query-pane": "r",
                 "--content-tab-auth-pane": "t",
@@ -263,10 +263,6 @@ class MainScreen(Screen[None]):
             yield collection_browser
             yield RequestEditor()
             yield ResponseArea()
-
-        footer = Footer(show_command_palette=False)
-        footer.compact = self.posting.spacing == "compact"
-        yield footer
 
     def get_and_run_script(
         self,
@@ -1126,10 +1122,6 @@ class MainScreen(Screen[None]):
         return self.query_one(UrlBar)
 
     @property
-    def footer(self) -> Footer:
-        return self.query_one(Footer)
-
-    @property
     def method_selector(self) -> MethodSelector:
         return self.query_one(MethodSelector)
 
@@ -1292,12 +1284,6 @@ class Posting(App[None], inherit_bindings=False):
     def watch_spacing(self, spacing: Literal["standard", "compact"]) -> None:
         is_compact = spacing == "compact"
         self.app.set_class(is_compact, "-compact")
-        try:
-            footer = self.screen.query_one(Footer)
-        except NoMatches:
-            pass
-        else:
-            footer.compact = is_compact
 
     @work(exclusive=True, group="environment-watcher")
     async def watch_environment_files(self) -> None:

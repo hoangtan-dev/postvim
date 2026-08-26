@@ -137,7 +137,7 @@ class TextAreaFooter(Horizontal):
 class PostingTextArea(TextArea):
     BINDINGS = [
         Binding("f3,ctrl+P", "open_in_pager", "Pager", id="open-in-pager"),
-        Binding("f4,ctrl+E", "open_in_editor", "Editor", id="open-in-editor"),
+        Binding("ctrl+e", "open_in_editor", "Editor", id="open-in-editor"),
     ]
 
     OPENING_BRACKETS = {

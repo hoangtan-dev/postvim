@@ -40,10 +40,10 @@ class RequestEditor(Vertical):
         with Vertical() as vertical:
             vertical.border_title = "Request"
             with RequestEditorTabbedContent():
-                with TabPane("Headers", id="headers-pane"):
-                    yield HeaderEditor()
                 with TabPane("Body", id="body-pane"):
                     yield Lazy(RequestBodyEditor())
+                with TabPane("Headers", id="headers-pane"):
+                    yield HeaderEditor()
                 with TabPane("Path", id="path-pane"):
                     yield Lazy(PathEditor())
                 with TabPane("Query", id="query-pane"):
