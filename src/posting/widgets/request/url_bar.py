@@ -1,5 +1,9 @@
 from dataclasses import dataclass
+import os
 import re
+import shlex
+import subprocess
+import tempfile
 from typing import Any
 from rich.text import Text
 from textual import on
@@ -48,6 +52,7 @@ Enter the URL to send a request to. Refer to variables from the environment (loa
 Resolved variables will be highlighted green. Move the cursor over a variable to preview the value.
 Base URL suggestions are loaded based on the URLs found in the currently open collection.
 Press `ctrl+l` to quickly focus this bar from elsewhere.
+Press `ctrl+e` to edit the URL in the configured external editor.
 
 You can also import a `curl` command by pasting it into the URL bar.
 This will fill out the request details in the UI based on the curl command you pasted, overwriting any existing values.
@@ -61,6 +66,7 @@ It's recommended you create a new request before pasting a curl command, to avoi
         Binding("down", "app.focus_next", "Focus next", show=False),
         Binding("alt+down", "jump_to_path_param", "Jump to Path param", show=False),
         Binding("ctrl+y", "copy_url", "Copy URL", show=False),
+        Binding("ctrl+e", "open_in_editor", "Editor", show=False),
     ]
 
     @dataclass
@@ -140,6 +146,43 @@ It's recommended you create a new request before pasting a curl command, to avoi
         if url:
             self.app.copy_to_clipboard(url)
             self.notify(f"Copied URL to clipboard: {url}")
+
+    def action_open_in_editor(self) -> None:
+        """Open the URL in the configured external editor."""
+        editor_command = SETTINGS.get().editor
+        if not editor_command:
+            self.app.notify(
+                severity="warning",
+                title="No editor configured",
+                message="Set the [b]$EDITOR[/b] environment variable.",
+            )
+            return
+
+        editor_args = shlex.split(editor_command)
+        with tempfile.NamedTemporaryFile(
+            suffix=".url", mode="w", encoding="utf-8", delete=False
+        ) as temp_file:
+            temp_file_name = temp_file.name
+            temp_file.write(self.value)
+
+        editor_args.append(temp_file_name)
+        try:
+            with self.app.suspend():
+                try:
+                    subprocess.call(editor_args)
+                except OSError:
+                    self.app.notify(
+                        severity="error",
+                        title="Can't run command",
+                        message=f"The command [b]{editor_command}[/b] failed to run.",
+                    )
+                    return
+
+            with open(temp_file_name, encoding="utf-8") as temp_file:
+                self.value = temp_file.read().rstrip("\n")
+            self.app.refresh()
+        finally:
+            os.remove(temp_file_name)
 
 
 class SendRequestButton(Button, can_focus=False):
