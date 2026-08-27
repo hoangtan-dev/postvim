@@ -11,7 +11,7 @@ from rich.text import Text
 from textual.content import Content
 
 from posting.importing.curl import CurlImport
-from textual import messages, on, log, work
+from textual import events, messages, on, log, work
 from textual.command import (
     CommandListItem,
     CommandPalette,
@@ -128,7 +128,7 @@ class MainScreen(Screen[None]):
             id="focus-method",
         ),
         Binding(
-            "ctrl+o",
+            "ctrl+o,f",
             "toggle_jump_mode",
             description="Jump",
             tooltip="Activate jump mode to quickly move focus between widgets.",
@@ -1210,6 +1210,9 @@ class Posting(App[None], inherit_bindings=False):
     COMMANDS = {PostingProvider}
     CSS_PATH = Path(__file__).parent / "posting.scss"
     BINDING_GROUP_TITLE = "Global Keybinds"
+    CUSTOM_KEY_ACTIONS = {
+        "f": "toggle_jump_mode",
+    }
     BINDINGS = [
         Binding(
             "ctrl+p",
@@ -1294,6 +1297,23 @@ class Posting(App[None], inherit_bindings=False):
                 self.main_screen.send_via_worker()
 
         self.push_screen(LeaderOverlay(self.settings.leader), handle_leader_action)
+
+    def handle_custom_key(self, event: events.Key) -> bool:
+        """Handle shortcuts which must take precedence over focused widgets."""
+        if event.key == self.settings.leader:
+            event.stop()
+            event.prevent_default()
+            self.action_leader()
+            return True
+
+        action_name = self.CUSTOM_KEY_ACTIONS.get(event.key)
+        if action_name is None:
+            return False
+
+        event.stop()
+        event.prevent_default()
+        getattr(self.main_screen, f"action_{action_name}")()
+        return True
 
     def on_ready(self) -> None:
         import time

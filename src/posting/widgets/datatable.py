@@ -9,7 +9,6 @@ from textual.binding import Binding
 from textual.color import Color
 from textual.coordinate import Coordinate
 from textual.filter import DimFilter
-from textual.markup import escape
 from textual.message import Message
 from textual.message_pump import MessagePump
 from textual.strip import Strip
@@ -54,6 +53,11 @@ PostingDataTable {
         """If True, rows will have a checkbox added to them and can be disabled with space bar."""
         self.cursor_foreground_priority = "renderable"
         self.click_chain = None
+
+    async def _on_key(self, event: events.Key) -> None:
+        if self.app.handle_custom_key(event):
+            return
+        await super()._on_key(event)
 
     @dataclass
     class Checkbox:

@@ -72,9 +72,6 @@ class PostingSelect(Select[T], inherit_bindings=False):
         return result
 
     async def _on_key(self, event: events.Key) -> None:
-        if event.key == self.app.settings.leader:
-            event.stop()
-            event.prevent_default()
-            self.app.action_leader()
+        if self.app.handle_custom_key(event):
             return
         await super()._on_key(event)

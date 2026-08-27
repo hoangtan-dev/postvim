@@ -12,6 +12,7 @@ from posting.widgets.response.response_body import ResponseTextArea
 from posting.widgets.response.response_headers import ResponseHeadersTable
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.reactive import Reactive, reactive
 from textual.widgets import TabPane
@@ -30,8 +31,15 @@ class ResponseArea(Vertical):
     COMPONENT_CLASSES = {
         "border-title-status",
     }
+    BINDINGS = [
+        Binding("slash", "open_response_in_pager", "Pager", show=False),
+    ]
 
     response: Reactive[httpx.Response | None] = reactive(None)
+
+    def action_open_response_in_pager(self) -> None:
+        """Open the loaded response without changing the active response tab."""
+        self.text_editor.text_area.action_open_in_pager()
 
     def on_mount(self) -> None:
         self.border_title = "Response"

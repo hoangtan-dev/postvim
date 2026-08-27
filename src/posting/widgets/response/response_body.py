@@ -1,4 +1,5 @@
 from textual import on
+from textual.binding import Binding
 from textual.widgets import TextArea
 from posting.help_data import HelpData
 
@@ -25,6 +26,10 @@ can be used for JSON responses by setting the `pager_json` config to the command
     )
 
     BINDING_GROUP_TITLE = "Response Body Text Area"
+
+    BINDINGS = ReadOnlyTextArea.BINDINGS + [
+        Binding("slash", "open_in_pager", "Pager", show=False),
+    ]
 
     @on(TextArea.Changed)
     def on_change(self, event: TextArea.Changed) -> None:

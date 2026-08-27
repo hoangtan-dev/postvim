@@ -10,10 +10,7 @@ from posting.config import SETTINGS
 class PostingInput(Input):
     async def _on_key(self, event: events.Key) -> None:
         """Keep inputs focusable while disabling direct editing in Posting."""
-        if event.key == self.app.settings.leader:
-            event.stop()
-            event.prevent_default()
-            self.app.action_leader()
+        if self.app.handle_custom_key(event):
             return
         if event.is_printable:
             # Let navigation bindings on parent widgets see keys such as j/k.
