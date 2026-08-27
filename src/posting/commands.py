@@ -1,7 +1,12 @@
 from functools import partial
-from typing import TYPE_CHECKING, cast
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlsplit
+
 from textual.command import DiscoveryHit, Hit, Hits, Provider
+from textual.screen import Screen
 from textual.types import IgnoreReturnCallbackType
+from posting.collection import RequestModel
 from posting.widgets.load_env_file_dialog import show_load_env_file_dialog
 
 if TYPE_CHECKING:
@@ -9,6 +14,68 @@ if TYPE_CHECKING:
 
 
 CommandType = tuple[str, IgnoreReturnCallbackType, str, bool]
+
+
+class RequestSearchProvider(Provider):
+    """Search requests by their identifying metadata."""
+
+    def __init__(
+        self,
+        screen: Screen[Any],
+        requests: Sequence[tuple[RequestModel, str, Callable[[], None]]],
+        match_style=None,
+    ) -> None:
+        super().__init__(screen, match_style)
+        self.requests = requests
+
+    @staticmethod
+    def _search_fields(request: RequestModel, path: str) -> tuple[str, ...]:
+        url_path = urlsplit(request.url).path or request.url
+        parameter_names = [
+            parameter.name for parameter in (*request.path_params, *request.params)
+        ]
+        return (
+            request.name,
+            path,
+            str(request.method),
+            url_path,
+            request.description,
+            " ".join(parameter_names),
+        )
+
+    async def search(self, query: str) -> Hits:
+        matcher = self.matcher(query)
+        for request, path, callback in self.requests:
+            scores = [
+                matcher.match(field)
+                for field in self._search_fields(request, path)
+                if field
+            ]
+            score = max(scores, default=0)
+            if score > 0:
+                yield Hit(
+                    score,
+                    matcher.highlight(request.name),
+                    callback,
+                    text=request.name,
+                    help=path,
+                )
+
+    async def discover(self) -> Hits:
+        for request, path, callback in self.requests:
+            yield DiscoveryHit(request.name, callback, help=path)
+
+
+def make_request_search_provider(
+    requests: Sequence[tuple[RequestModel, str, Callable[[], None]]],
+) -> type[RequestSearchProvider]:
+    """Bind request data to a provider class for CommandPalette."""
+
+    class BoundRequestSearchProvider(RequestSearchProvider):
+        def __init__(self, screen, match_style=None) -> None:
+            super().__init__(screen, requests, match_style)
+
+    return BoundRequestSearchProvider
 
 
 class PostingProvider(Provider):

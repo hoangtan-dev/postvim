@@ -58,6 +58,8 @@ class JumpOverlay(ModalScreen[str | Widget | None]):
             # then we jump to it.
             target = self.keys_to_widgets.get(key_event.key)
             if target is not None:
+                key_event.stop()
+                key_event.prevent_default()
                 self.dismiss(target)
                 return
 

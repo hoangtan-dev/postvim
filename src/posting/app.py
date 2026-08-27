@@ -15,7 +15,6 @@ from textual import messages, on, log, work
 from textual.command import (
     CommandListItem,
     CommandPalette,
-    SimpleCommand,
     SimpleProvider,
 )
 from textual.css.query import NoMatches
@@ -42,7 +41,7 @@ from posting.collection import (
     RequestModel,
 )
 
-from posting.commands import PostingProvider
+from posting.commands import PostingProvider, make_request_search_provider
 from posting.config import SETTINGS, Settings
 from posting.jump_overlay import JumpOverlay
 from posting.jumper import Jumper
@@ -974,22 +973,23 @@ class MainScreen(Screen[None]):
                     break
 
         collection_path = self.collection.path
-        self.app.search_commands(
-            [
-                SimpleCommand(
-                    name=node.data.name if node.data.path else node.data.name,
-                    callback=lambda request=node.data: load_and_select_request(request),
-                    help_text=(
-                        str(node.data.path.relative_to(collection_path))
-                        if node.data.path
-                        else ""
-                    ),
-                )
-                for node in collection_tree_nodes
-                if isinstance(node.data, RequestModel)
-            ],
-            placeholder="Search for a request…",
-            palette_id="request-search-palette",
+        requests = [
+            (
+                node.data,
+                str(node.data.path.relative_to(collection_path))
+                if node.data.path
+                else "",
+                lambda request=node.data: load_and_select_request(request),
+            )
+            for node in collection_tree_nodes
+            if isinstance(node.data, RequestModel)
+        ]
+        self.app.push_screen(
+            CommandPalette(
+                providers=[make_request_search_provider(requests)],
+                placeholder="Search for a request…",
+                id="request-search-palette",
+            )
         )
 
     def load_request_model(
