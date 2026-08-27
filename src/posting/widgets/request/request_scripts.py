@@ -12,9 +12,10 @@ from textual_autocomplete import AutoComplete, DropdownItem, TargetState
 from posting.collection import Scripts
 from posting.config import SETTINGS
 from posting.scripts import uncache_module
+from posting.widgets.input import PostingInput
 
 
-class ScriptPathInput(Input):
+class ScriptPathInput(PostingInput):
     BINDINGS = [
         Binding(
             "ctrl+e",

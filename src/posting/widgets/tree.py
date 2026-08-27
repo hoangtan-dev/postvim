@@ -1,4 +1,5 @@
 from typing import Generator, TypeVar
+from textual import events
 from textual.binding import Binding
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
@@ -7,6 +8,8 @@ T = TypeVar("T")
 
 
 class PostingTree(Tree[T]):
+    inherit_bindings = False
+
     DEFAULT_CSS = """\
     PostingTree { 
         scrollbar-size-horizontal: 0;
@@ -27,8 +30,16 @@ class PostingTree(Tree[T]):
         Binding("g", "scroll_home", "Cursor To Top", show=False),
         Binding("G", "scroll_end", "Cursor To Bottom", show=False),
         Binding("enter,l,h", "select_cursor", "Select Cursor", show=False),
-        Binding("space,r", "toggle_node", "Toggle Expand", show=False),
+        Binding("r", "toggle_node", "Toggle Expand", show=False),
     ]
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == self.app.settings.leader:
+            event.stop()
+            event.prevent_default()
+            self.app.action_leader()
+            return
+        await super()._on_key(event)
 
     def action_cursor_up_parent(self) -> None:
         """Move the cursor to the previous collapsible node."""

@@ -150,7 +150,7 @@ It's recommended you create a new request before pasting a curl command, to avoi
         Binding("down", "app.focus_next", "Focus next", show=False),
         Binding("alt+down", "jump_to_path_param", "Jump to Path param", show=False),
         Binding("ctrl+y", "copy_url", "Copy URL", show=False),
-        Binding("ctrl+e", "open_in_editor", "Editor", show=False),
+        Binding("ctrl+e,a", "open_in_editor", "Editor", show=False),
     ]
 
     @dataclass

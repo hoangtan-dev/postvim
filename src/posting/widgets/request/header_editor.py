@@ -265,7 +265,6 @@ in the body tab. Setting a header in this table will override the default value 
 
     BINDINGS = [
         Binding("backspace", action="remove_row", description="Remove header"),
-        Binding("space", action="toggle_row", description="Toggle header"),
     ]
 
     def on_mount(self):

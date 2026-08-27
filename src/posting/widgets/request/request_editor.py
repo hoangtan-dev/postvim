@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any, cast
-from rich.text import Text
-from textual import on, log
+from textual import on
 from textual.binding import Binding
 from textual.css.query import NoMatches
 from textual.app import ComposeResult
@@ -17,9 +16,8 @@ from posting.widgets.request.request_body import RequestBodyEditor, RequestBodyT
 from posting.widgets.request.request_metadata import RequestMetadata
 from posting.widgets.request.request_options import RequestOptions
 from posting.widgets.request.request_scripts import RequestScripts
-from posting.widgets.request.path_editor import PathEditor, PathParamsTable
+from posting.widgets.request.path_editor import PathEditor
 from posting.widgets.tabbed_content import PostingTabbedContent
-from posting.widgets.request.url_bar import UrlInput
 from posting.widgets.text_area import TextEditor
 
 
@@ -29,7 +27,7 @@ if TYPE_CHECKING:
 
 class RequestEditorTabbedContent(PostingTabbedContent):
     BINDINGS = [
-        Binding("ctrl+e", "open_body_in_editor", "Editor", show=False),
+        Binding("ctrl+e,a", "open_body_in_editor", "Editor", show=False),
     ]
 
     def action_open_body_in_editor(self) -> None:

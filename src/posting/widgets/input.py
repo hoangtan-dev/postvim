@@ -1,4 +1,5 @@
 from rich.style import Style
+from textual import events
 from textual.theme import Theme
 from textual.widgets import Input
 
@@ -7,6 +8,27 @@ from posting.config import SETTINGS
 
 
 class PostingInput(Input):
+    async def _on_key(self, event: events.Key) -> None:
+        """Keep inputs focusable while disabling direct editing in Posting."""
+        if event.key == self.app.settings.leader:
+            event.stop()
+            event.prevent_default()
+            self.app.action_leader()
+            return
+        if event.is_printable:
+            # Let navigation bindings on parent widgets see keys such as j/k.
+            event.prevent_default()
+            return
+        if event.key in {"backspace", "delete", "enter", "ctrl+v", "shift+insert"}:
+            event.stop()
+            event.prevent_default()
+            return
+        await super()._on_key(event)
+
+    def _on_paste(self, event: events.Paste) -> None:
+        event.stop()
+        event.prevent_default()
+
     def on_mount(self) -> None:
         self.cursor_blink = SETTINGS.get().text_input.blinking_cursor
 

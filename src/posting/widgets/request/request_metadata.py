@@ -29,7 +29,7 @@ class RequestMetadata(VerticalScroll):
         yield Label("Name [dim]optional[/dim]")
         yield VariableInput(placeholder="Enter a name…", id="name-input")
         yield Label("Description [dim]optional[/dim]")
-        yield PostingTextArea(id="description-textarea")
+        yield PostingTextArea(id="description-textarea", read_only=True)
         yield Label("Path [dim]read-only[/dim]")
         yield ReadOnlyTextArea(
             "Request not saved to disk.", select_on_focus=True, id="request-path"

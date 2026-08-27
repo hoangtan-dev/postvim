@@ -45,6 +45,7 @@ from posting.commands import PostingProvider, make_request_search_provider
 from posting.config import SETTINGS, Settings
 from posting.jump_overlay import JumpOverlay
 from posting.jumper import Jumper
+from posting.leader_overlay import LeaderOverlay
 from posting.scripts import execute_script, uncache_module, Posting as PostingContext
 from posting.themes import (
     BUILTIN_THEMES,
@@ -134,6 +135,14 @@ class MainScreen(Screen[None]):
             id="jump",
         ),
         Binding(
+            "space",
+            "app.leader",
+            description="Leader",
+            show=False,
+            priority=True,
+            id="leader",
+        ),
+        Binding(
             "ctrl+l",
             "app.focus('url-input')",
             "Focus URL input",
@@ -199,6 +208,7 @@ class MainScreen(Screen[None]):
         environment_files: tuple[Path, ...],
     ) -> None:
         super().__init__()
+
         self.collection = collection
         self.cookies: httpx.Cookies = httpx.Cookies()
         self._initial_layout: PostingLayout = layout
@@ -1264,6 +1274,8 @@ class Posting(App[None], inherit_bindings=False):
 
         super().__init__()
 
+        self.bind(self.settings.leader, "leader", show=False)
+
         # The animation is set AFTER the app is initialized intentionally,
         # as it needs to override the default approach taken by Textual in
         # App.__init__().
@@ -1273,6 +1285,15 @@ class Posting(App[None], inherit_bindings=False):
         self.set_reactive(Posting.spacing, settings.spacing)
         """The initial spacing of the app is taken from settings, but is a reactive
         which can be toggled via the command palette."""
+
+    def action_leader(self) -> None:
+        def handle_leader_action(action: str | None) -> None:
+            if action == "search":
+                self.main_screen.action_open_request_search_palette()
+            elif action == "send":
+                self.main_screen.send_via_worker()
+
+        self.push_screen(LeaderOverlay(self.settings.leader), handle_leader_action)
 
     def on_ready(self) -> None:
         import time

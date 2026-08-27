@@ -1,4 +1,5 @@
 from typing import TypeVar
+from textual import events
 from textual.binding import Binding
 from textual.widgets import Select
 from textual.widgets._select import SelectOverlay, SelectCurrent
@@ -22,7 +23,7 @@ class PostingSelectOverlay(SelectOverlay, inherit_bindings=False):
         elif event.key == "j":
             self.action_cursor_down()
             should_stop_event = True
-        elif event.key == "l" or event.key == "space":
+        elif event.key == "l":
             self.action_select()
             should_stop_event = True
 
@@ -37,7 +38,7 @@ class PostingSelectOverlay(SelectOverlay, inherit_bindings=False):
 
 class PostingSelect(Select[T], inherit_bindings=False):
     BINDINGS = [
-        Binding("enter,space,l", "show_overlay", "Show Overlay", show=False),
+        Binding("enter,l", "show_overlay", "Show Overlay", show=False),
         Binding("up,k", "cursor_up", "Cursor Up", show=False),
         Binding("down,j", "cursor_down", "Cursor Down", show=False),
     ]
@@ -69,3 +70,11 @@ class PostingSelect(Select[T], inherit_bindings=False):
     def select_overlay(self) -> PostingSelectOverlay:
         result: SelectOverlay = self.query_one(PostingSelectOverlay)
         return result
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == self.app.settings.leader:
+            event.stop()
+            event.prevent_default()
+            self.app.action_leader()
+            return
+        await super()._on_key(event)

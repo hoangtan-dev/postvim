@@ -17,7 +17,6 @@ class ParamsTable(PostingDataTable):
 
     BINDINGS = [
         Binding("backspace", action="remove_row", description="Remove row"),
-        Binding("space", action="toggle_row", description="Toggle row"),
     ]
 
     def on_mount(self):

@@ -167,6 +167,7 @@ class NewRequestModal(ModalScreen[NewRequestData | None]):
             yield PostingTextArea(
                 self._initial_description,
                 id="description-textarea",
+                read_only=True,
                 show_line_numbers=False,
             )
 

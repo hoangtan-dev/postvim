@@ -6,6 +6,8 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
 from textual.widgets import Input
+
+from posting.widgets.input import PostingInput
 from textual.widgets.data_table import RowKey
 
 from posting.collection import PathParam
@@ -94,7 +96,7 @@ class PathParamsEditor(KeyValueEditor):
         super().__init__(
             PathParamsTable(),
             KeyValueInput(
-                Input(placeholder="Key", id="path-key-input"),
+                PostingInput(placeholder="Key", id="path-key-input"),
                 VariableInput(placeholder="Value"),
                 button_label="Update",
             ),

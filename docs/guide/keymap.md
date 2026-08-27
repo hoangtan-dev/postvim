@@ -80,3 +80,7 @@ These are the IDs of the actions that you can change the keybinding for:
 - `open-in-pager` - Open the content of the focused text area in your $PAGER/$POSTING_PAGER/$POSTING_PAGER_JSON. Default: `f3`.
 - `open-in-editor` - Open the content of the focused text area in your $EDITOR/$POSTING_EDITOR. Default: `ctrl+e`.
 - `search-requests` - Go to a request by name. Default: `ctrl+shift+p`.
+
+The leader key defaults to `space` and can be changed with the `leader` setting.
+Press the leader key twice to search requests, or follow it with `r` to send the
+current request, for example `space space` or `space r`.

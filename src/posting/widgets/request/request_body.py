@@ -2,6 +2,7 @@ import os
 import tempfile
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import ContentSwitcher, Label
 from textual_tty import Terminal
@@ -41,7 +42,7 @@ class RequestBodyEditor(Vertical):
                 Label("No request body"),
                 id="no-body-label",
             )
-            text_area = RequestBodyTextArea(language="json")
+            text_area = RequestBodyTextArea(language="json", read_only=True)
             yield TextEditor(
                 text_area=text_area,
                 footer=TextAreaFooter(text_area),
@@ -145,6 +146,10 @@ class RequestBodyTextArea(PostingTextArea):
     """
 
     BINDING_GROUP_TITLE = "Request Body Text Area"
+
+    BINDINGS = PostingTextArea.BINDINGS + [
+        Binding("a", "open_in_editor", "Editor", show=False),
+    ]
 
     help = HelpData(
         title="Request Body Text Area",

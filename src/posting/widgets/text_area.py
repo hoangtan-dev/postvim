@@ -264,6 +264,12 @@ class PostingTextArea(TextArea):
     def on_key(self, event: events.Key) -> None:
         character = event.character
 
+        if event.key == self.app.settings.leader:
+            event.stop()
+            event.prevent_default()
+            self.app.action_leader()
+            return
+
         if self.read_only:
             return
 
