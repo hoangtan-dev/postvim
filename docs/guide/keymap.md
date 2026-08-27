@@ -82,5 +82,6 @@ These are the IDs of the actions that you can change the keybinding for:
 - `search-requests` - Go to a request by name. Default: `ctrl+shift+p`.
 
 The leader key defaults to `space` and can be changed with the `leader` setting.
-Press the leader key twice to search requests, or follow it with `r` to send the
-current request, for example `space space` or `space r`.
+Press the leader key twice to search requests, follow it with `r` to send the
+current request, or use `y` then `c` to copy the current request as cURL. For
+example: `space space`, `space r`, or `space y c`.

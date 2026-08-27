@@ -1,7 +1,10 @@
 import inspect
+import json
 from contextlib import redirect_stdout, redirect_stderr
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 from typing import Any, Literal, Sequence, cast
 
@@ -30,7 +33,7 @@ from textual.signal import Signal
 from textual.theme import Theme, BUILTIN_THEMES as TEXTUAL_THEMES
 from textual.widget import AwaitMount, Widget
 from textual.widgets.input import Selection
-from textual.widgets import Button, Input, Label, Tab, Tabs
+from textual.widgets import Button, ContentSwitcher, Input, Label, Tab, TabPane, Tabs
 from textual.widgets.tabbed_content import ContentTab
 from posting.collection import (
     Collection,
@@ -73,10 +76,11 @@ from posting.widgets.request.method_selection import MethodSelector
 from posting.widgets.request.query_editor import ParamsTable
 from posting.widgets.request.path_editor import PathParamsTable
 from posting.widgets.request.path_editor import PathParamsEditor
+from posting.widgets.request.form_editor import FormTable
 from posting.widgets.request.request_auth import RequestAuth
 
-from posting.widgets.request.request_body import RequestBodyTextArea
-from posting.widgets.request.request_editor import RequestEditor
+from posting.widgets.request.request_body import RequestBodyEditor, RequestBodyTextArea
+from posting.widgets.request.request_editor import RequestEditor, RequestEditorTabbedContent
 from posting.widgets.request.request_metadata import RequestMetadata
 from posting.widgets.request.request_options import RequestOptions
 from posting.widgets.request.request_scripts import RequestScripts
@@ -1067,6 +1071,94 @@ class MainScreen(Screen[None]):
     def action_toggle_jump_mode(self) -> None:
         self._jumping = not self._jumping
 
+    @staticmethod
+    def _table_content(table: PostingDataTable) -> str:
+        lines = []
+        for row_index in range(table.row_count):
+            row = table.get_row_at(row_index)
+            values = [cell.plain if isinstance(cell, Text) else str(cell) for cell in row]
+            lines.append(": ".join(values))
+        return "\n".join(lines)
+
+    def action_yank_active_content(self) -> None:
+        """Copy the full contents of the currently active request or response tab."""
+        request_tabs = self.request_editor.query_one(RequestEditorTabbedContent)
+        response_tabs = self.response_area.tabbed_content
+        focused = self.focused
+        if focused is None:
+            return
+
+        ancestors = focused.ancestors
+        in_request = any(ancestor is self.request_editor for ancestor in ancestors)
+        in_response = any(ancestor is self.response_area for ancestor in ancestors)
+        focused_pane = next(
+            (ancestor for ancestor in ancestors if isinstance(ancestor, TabPane)),
+            None,
+        )
+
+        if in_request:
+            active = focused_pane.id if focused_pane is not None else request_tabs.active
+            if active == "body-pane":
+                body_editor = self.request_editor.query_one(RequestBodyEditor)
+                switcher = body_editor.query_one(ContentSwitcher)
+                if switcher.current == "text-body-editor":
+                    content = self.request_editor.text_editor.text_area.text
+                elif switcher.current == "form-body-editor":
+                    content = self._table_content(
+                        self.request_editor.form_editor.query_one(FormTable)
+                    )
+                else:
+                    content = ""
+            elif active == "headers-pane":
+                content = self._table_content(self.headers_table)
+            elif active == "path-pane":
+                content = self._table_content(
+                    self.request_editor.query_one(PathParamsTable)
+                )
+            elif active == "query-pane":
+                content = self._table_content(self.request_editor.query_one(ParamsTable))
+            elif active == "auth-pane":
+                model = self.request_auth.to_model()
+                content = model.model_dump_json(indent=2) if model else ""
+            elif active == "info-pane":
+                metadata = self.request_metadata
+                content = (
+                    f"Name: {metadata.request_name}\n"
+                    f"Description: {metadata.description}\n"
+                    f"Path: {metadata.request_path_text_area.text}"
+                )
+            elif active == "scripts-pane":
+                content = self.request_scripts.to_model().model_dump_json(indent=2)
+            elif active == "options-pane":
+                content = self.request_options.to_model().model_dump_json(indent=2)
+            else:
+                content = ""
+        elif in_response:
+            active = focused_pane.id if focused_pane is not None else response_tabs.active
+            if active == "response-body-pane":
+                content = self.response_area.text_editor.text_area.text
+            elif active == "response-headers-pane":
+                content = self._table_content(self.response_area.headers_table)
+            elif active == "response-cookies-pane":
+                content = self._table_content(self.response_area.cookies_section.table)
+            elif active == "response-scripts-pane":
+                content = "\n".join(
+                    line.text for line in self.response_script_output.rich_log.lines
+                )
+            elif active == "response-trace-pane":
+                content = json.dumps(self.response_trace.events, indent=2)
+            else:
+                content = ""
+        else:
+            return
+
+        if not content:
+            self.notify("Nothing to copy", severity="warning")
+            return
+
+        self.posting.copy_to_clipboard(content)
+        self.notify("Content copied to clipboard", title="Copied to clipboard")
+
     def watch__jumping(self, jumping: bool) -> None:
         if self.jumper is None:
             return
@@ -1289,14 +1381,45 @@ class Posting(App[None], inherit_bindings=False):
         """The initial spacing of the app is taken from settings, but is a reactive
         which can be toggled via the command palette."""
 
+    def copy_to_clipboard(self, text: str) -> None:
+        """Copy text using the native Wayland clipboard when available."""
+        wl_copy = shutil.which("wl-copy")
+        if wl_copy:
+            try:
+                subprocess.run(
+                    [wl_copy],
+                    input=text,
+                    text=True,
+                    check=True,
+                    timeout=2,
+                )
+            except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                log.warning("wl-copy failed; falling back to OSC 52 clipboard")
+            else:
+                return
+
+        super().copy_to_clipboard(text)
+
     def action_leader(self) -> None:
         def handle_leader_action(action: str | None) -> None:
             if action == "search":
                 self.main_screen.action_open_request_search_palette()
             elif action == "send":
                 self.main_screen.send_via_worker()
+            elif action == "yank_curl":
+                self.command_export_to_curl()
 
-        self.push_screen(LeaderOverlay(self.settings.leader), handle_leader_action)
+        self.push_screen(
+            LeaderOverlay(
+                self.settings.leader,
+                {
+                    (self.settings.leader,): "search",
+                    ("r",): "send",
+                    ("y", "c"): "yank_curl",
+                },
+            ),
+            handle_leader_action,
+        )
 
     def handle_custom_key(self, event: events.Key) -> bool:
         """Handle shortcuts which must take precedence over focused widgets."""
@@ -1305,6 +1428,20 @@ class Posting(App[None], inherit_bindings=False):
             event.prevent_default()
             self.action_leader()
             return True
+
+        if event.key == "y":
+            focused = self.main_screen.focused
+            if focused is not None:
+                ancestors = focused.ancestors
+                if any(
+                    ancestor is self.main_screen.request_editor
+                    or ancestor is self.main_screen.response_area
+                    for ancestor in ancestors
+                ):
+                    event.stop()
+                    event.prevent_default()
+                    self.main_screen.action_yank_active_content()
+                    return True
 
         action_name = self.CUSTOM_KEY_ACTIONS.get(event.key)
         if action_name is None:

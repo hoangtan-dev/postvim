@@ -46,7 +46,7 @@ def test_import_postman_spec():
                             verify_ssl=True,
                             attach_cookies=True,
                             proxy_url="",
-                            timeout=5.0,
+                            timeout=10.0,
                         ),
                     )
                 ],
@@ -77,7 +77,7 @@ def test_import_postman_spec():
                                     verify_ssl=True,
                                     attach_cookies=True,
                                     proxy_url="",
-                                    timeout=5.0,
+                                    timeout=10.0,
                                 ),
                             )
                         ],

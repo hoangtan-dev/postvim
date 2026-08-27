@@ -20,7 +20,12 @@ from textual.widgets._tabbed_content import ContentTabs
 
 
 class ResponseTabbedContent(PostingTabbedContent):
-    pass
+    BINDINGS = PostingTabbedContent.BINDINGS + [
+        Binding("y", "yank_active_content", "Yank content", show=False, priority=True),
+    ]
+
+    def action_yank_active_content(self) -> None:
+        self.screen.action_yank_active_content()
 
 
 class ResponseArea(Vertical):

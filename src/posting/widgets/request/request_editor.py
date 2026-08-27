@@ -26,8 +26,9 @@ if TYPE_CHECKING:
 
 
 class RequestEditorTabbedContent(PostingTabbedContent):
-    BINDINGS = [
+    BINDINGS = PostingTabbedContent.BINDINGS + [
         Binding("ctrl+e,a", "open_body_in_editor", "Editor", show=False),
+        Binding("y", "yank_active_content", "Yank content", show=False, priority=True),
     ]
 
     def action_open_body_in_editor(self) -> None:
@@ -46,6 +47,9 @@ class RequestEditorTabbedContent(PostingTabbedContent):
             return
 
         text_area.action_open_in_editor()
+
+    def action_yank_active_content(self) -> None:
+        self.screen.action_yank_active_content()
 
 
 class RequestEditor(Vertical):

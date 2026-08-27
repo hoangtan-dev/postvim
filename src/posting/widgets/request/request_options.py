@@ -131,7 +131,7 @@ class RequestOptions(VerticalScroll):
         try:
             self.options.timeout = float(event.value)
         except ValueError:
-            self.options.timeout = 5.0
+            self.options.timeout = 10.0
 
     @on(DescendantFocus)
     def on_descendant_focus(self, event: DescendantFocus) -> None:

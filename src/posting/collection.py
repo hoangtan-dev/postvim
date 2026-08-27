@@ -105,7 +105,7 @@ class Options(BaseModel):
     verify_ssl: bool = Field(default=True)
     attach_cookies: bool = Field(default=True)
     proxy_url: str = Field(default="")
-    timeout: float = Field(default=5.0)
+    timeout: float = Field(default=10.0)
 
 
 class RequestBody(BaseModel):
@@ -378,7 +378,7 @@ class RequestModel(BaseModel):
         if not self.options.verify_ssl:
             parts.append("--insecure")
 
-        if self.options.timeout != 5.0:  # Only add if not the default
+        if self.options.timeout != 10.0:  # Only add if not the default
             parts.append(f"--max-time {self.options.timeout}")
 
         if self.options.proxy_url:

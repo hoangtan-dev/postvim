@@ -3,7 +3,7 @@ from textual.screen import ModalScreen
 
 
 class LeaderOverlay(ModalScreen[str | None]):
-    """Capture the key following the configured leader key."""
+    """Capture a key sequence following the configured leader key."""
 
     DEFAULT_CSS = """
     LeaderOverlay {
@@ -11,9 +11,11 @@ class LeaderOverlay(ModalScreen[str | None]):
     }
     """
 
-    def __init__(self, leader: str) -> None:
+    def __init__(self, leader: str, actions: dict[tuple[str, ...], str]) -> None:
         super().__init__()
         self.leader = leader
+        self.actions = actions
+        self._sequence: tuple[str, ...] = ()
 
     def on_mount(self) -> None:
         self.styles.background = "transparent"
@@ -22,9 +24,14 @@ class LeaderOverlay(ModalScreen[str | None]):
         event.stop()
         event.prevent_default()
 
-        if event.key == self.leader:
-            self.dismiss("search")
-        elif event.key == "r":
-            self.dismiss("send")
-        else:
-            self.dismiss(None)
+        sequence = (*self._sequence, event.key)
+        action = self.actions.get(sequence)
+        if action is not None:
+            self.dismiss(action)
+            return
+
+        if any(candidate[: len(sequence)] == sequence for candidate in self.actions):
+            self._sequence = sequence
+            return
+
+        self.dismiss(None)

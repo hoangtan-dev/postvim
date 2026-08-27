@@ -180,12 +180,12 @@ def test_request_with_options():
         options=Options(
             follow_redirects=False,
             verify_ssl=False,
-            timeout=10.0,
+            timeout=15.0,
             proxy_url="http://proxy.example.com:8080",
         ),
     )
 
-    expected = "curl \\\n  --no-location \\\n  --insecure \\\n  --max-time 10.0 \\\n  --proxy 'http://proxy.example.com:8080' \\\n  'https://example.com/api'"
+    expected = "curl \\\n  --no-location \\\n  --insecure \\\n  --max-time 15.0 \\\n  --proxy 'http://proxy.example.com:8080' \\\n  'https://example.com/api'"
     assert request.to_curl() == expected
 
 
