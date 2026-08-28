@@ -69,30 +69,30 @@ class BearerTokenAuth(BaseModel):
 
 class PathParam(BaseModel):
     name: str
-    value: str
+    value: str | None
 
 
 class Header(BaseModel):
     name: str
-    value: str
+    value: str | None
     enabled: bool = Field(default=True)
 
 
 class FormItem(BaseModel):
     name: str
-    value: str
+    value: str | None
     enabled: bool = Field(default=True)
 
 
 class QueryParam(BaseModel):
     name: str
-    value: str
+    value: str | None
     enabled: bool = Field(default=True)
 
 
 class Cookie(BaseModel):
     name: str
-    value: str
+    value: str | None
     enabled: bool = Field(default=True)
 
     @classmethod
@@ -125,7 +125,11 @@ class RequestBody(BaseModel):
         if self.form_data:
             # Ensure we don't delete duplicate keys
             httpx_args["data"] = tuples_to_dict(
-                [(item.name, item.value) for item in self.form_data if item.enabled]
+                [
+                    (item.name, item.value)
+                    for item in self.form_data
+                    if item.enabled and item.value is not None
+                ]
             )
         return httpx_args
 
@@ -208,6 +212,8 @@ class RequestModel(BaseModel):
             # Resolve variables in path parameter values
             if self.path_params:
                 for param in self.path_params:
+                    if param.value is None:
+                        continue
                     template = Template(param.value)
                     param.value = template.substitute(variables)
 
@@ -226,17 +232,23 @@ class RequestModel(BaseModel):
                     self.body.content = template.substitute(variables)
                 if self.body.form_data:
                     for item in self.body.form_data:
+                        if item.value is None:
+                            continue
                         template = Template(item.name)
                         item.name = template.substitute(variables)
                         template = Template(item.value)
                         item.value = template.substitute(variables)
 
             for header in self.headers:
+                if header.value is None:
+                    continue
                 template = Template(header.name)
                 header.name = template.substitute(variables)
                 template = Template(header.value)
                 header.value = template.substitute(variables)
             for param in self.params:
+                if param.value is None:
+                    continue
                 template = Template(param.name)
                 param.name = template.substitute(variables)
                 template = Template(param.value)
@@ -258,7 +270,9 @@ class RequestModel(BaseModel):
                     self.auth.bearer_token.token = template.substitute(variables)
             # After resolving variables, substitute path parameters into the URL and ensure protocol
             if self.path_params:
-                substitutions = {p.name: p.value for p in self.path_params}
+                substitutions = {
+                    p.name: p.value for p in self.path_params if p.value is not None
+                }
                 self.url = substitute_path_params(self.url, substitutions)
 
             self.url = ensure_protocol(self.url)
@@ -269,7 +283,11 @@ class RequestModel(BaseModel):
     def to_httpx(self, client: httpx.AsyncClient) -> httpx.Request:
         """Convert the request model to an httpx request."""
         headers = httpx.Headers(
-            [(header.name, header.value) for header in self.headers if header.enabled]
+            [
+                (header.name, header.value)
+                for header in self.headers
+                if header.enabled and header.value is not None
+            ]
         )
         return client.build_request(
             method=self.method,
@@ -277,20 +295,24 @@ class RequestModel(BaseModel):
             **(self.body.to_httpx_args() if self.body else {}),
             headers=headers,
             params=httpx.QueryParams(
-                [(param.name, param.value) for param in self.params if param.enabled]
+                [
+                    (param.name, param.value)
+                    for param in self.params
+                    if param.enabled and param.value is not None
+                ]
             ),
             cookies=httpx.Cookies(
                 [
                     (cookie.name, cookie.value)
                     for cookie in self.cookies
-                    if cookie.enabled
+                    if cookie.enabled and cookie.value is not None
                 ]
             ),
         )
 
     def save_to_disk(self, path: Path) -> None:
         """Save the request model to a YAML file."""
-        content = self.model_dump(exclude_defaults=True, exclude_none=True)
+        content = self.model_dump(exclude_defaults=True)
         yaml_content = dump(
             content,
             None,
@@ -328,14 +350,14 @@ class RequestModel(BaseModel):
             parts.append(f"-X {self.method}")
 
         for header in self.headers:
-            if header.enabled:
+            if header.enabled and header.value is not None:
                 parts.append(f"-H '{header.name}: {header.value}'")
 
         parsed_url = urlparse(self.url)
         existing_params = parse_qsl(parsed_url.query)
         if self.params:
             for param in self.params:
-                if param.enabled:
+                if param.enabled and param.value is not None:
                     existing_params.append((param.name, param.value))
 
         new_query = urlencode(existing_params)
@@ -355,7 +377,7 @@ class RequestModel(BaseModel):
 
         if self.body and self.body.form_data:
             for item in self.body.form_data:
-                if item.enabled:
+                if item.enabled and item.value is not None:
                     parts.append(f"-d '{item.name}={item.value}'")
 
         if self.auth:
@@ -369,7 +391,7 @@ class RequestModel(BaseModel):
                 )
 
         for cookie in self.cookies:
-            if cookie.enabled:
+            if cookie.enabled and cookie.value is not None:
                 parts.append(f"--cookie '{cookie.name}={cookie.value}'")
 
         if not self.options.follow_redirects:

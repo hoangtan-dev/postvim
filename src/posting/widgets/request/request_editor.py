@@ -9,14 +9,16 @@ from textual.widgets import ContentSwitcher, Select, TabPane
 from posting.collection import RequestBody
 from posting.widgets.request.form_editor import FormEditor
 
-from posting.widgets.request.header_editor import HeaderEditor
+from posting.widgets.request.header_editor import HeaderEditor, HeadersTable
 from posting.widgets.request.query_editor import QueryStringEditor
+from posting.widgets.request.query_editor import ParamsTable
 from posting.widgets.request.request_auth import RequestAuth
 from posting.widgets.request.request_body import RequestBodyEditor, RequestBodyTextArea
 from posting.widgets.request.request_metadata import RequestMetadata
 from posting.widgets.request.request_options import RequestOptions
 from posting.widgets.request.request_scripts import RequestScripts
 from posting.widgets.request.path_editor import PathEditor
+from posting.widgets.request.path_editor import PathParamsTable
 from posting.widgets.tabbed_content import PostingTabbedContent
 from posting.widgets.text_area import TextEditor
 
@@ -27,9 +29,15 @@ if TYPE_CHECKING:
 
 class RequestEditorTabbedContent(PostingTabbedContent):
     BINDINGS = PostingTabbedContent.BINDINGS + [
-        Binding("ctrl+e,a", "open_body_in_editor", "Editor", show=False),
+        Binding("ctrl+e", "open_body_in_editor", "Editor", show=False),
         Binding("y", "yank_active_content", "Yank content", show=False, priority=True),
+        Binding("a", "open_active_dict_editor", "Edit mapping", show=False),
     ]
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "open_active_dict_editor":
+            return self.active in {"headers-pane", "path-pane", "query-pane"}
+        return super().check_action(action, parameters)
 
     def action_open_body_in_editor(self) -> None:
         if self.active != "body-pane":
@@ -50,6 +58,14 @@ class RequestEditorTabbedContent(PostingTabbedContent):
 
     def action_yank_active_content(self) -> None:
         self.screen.action_yank_active_content()
+
+    def action_open_active_dict_editor(self) -> None:
+        if self.active == "headers-pane":
+            self.query_one(HeadersTable).action_open_dict_editor()
+        elif self.active == "path-pane":
+            self.query_one(PathParamsTable).action_open_dict_editor()
+        elif self.active == "query-pane":
+            self.query_one(ParamsTable).action_open_dict_editor()
 
 
 class RequestEditor(Vertical):

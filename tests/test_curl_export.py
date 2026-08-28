@@ -1,4 +1,6 @@
 import pytest
+import httpx
+import yaml
 from posting.collection import (
     RequestModel,
     Header,
@@ -187,6 +189,29 @@ def test_request_with_options():
 
     expected = "curl \\\n  --no-location \\\n  --insecure \\\n  --max-time 15.0 \\\n  --proxy 'http://proxy.example.com:8080' \\\n  'https://example.com/api'"
     assert request.to_curl() == expected
+
+
+def test_null_request_values_are_preserved_and_not_sent(tmp_path):
+    request = RequestModel(
+        name="Nullable values",
+        method="GET",
+        url="https://example.com/api",
+        headers=[Header(name="X-Optional", value=None)],
+        params=[QueryParam(name="optional", value=None)],
+        path_params=[],
+    )
+
+    request_path = tmp_path / "nullable.posting.yaml"
+    request.save_to_disk(request_path)
+    content = request_path.read_text()
+    loaded = RequestModel.model_validate(yaml.safe_load(content))
+
+    assert loaded.headers[0].value is None
+    assert loaded.params[0].value is None
+    with httpx.Client() as client:
+        httpx_request = loaded.to_httpx(client)
+    assert "X-Optional" not in httpx_request.headers
+    assert "optional" not in str(httpx_request.url)
 
 
 def test_complex_request():

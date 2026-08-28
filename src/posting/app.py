@@ -35,6 +35,7 @@ from textual.widget import AwaitMount, Widget
 from textual.widgets.input import Selection
 from textual.widgets import Button, ContentSwitcher, Input, Label, Tab, TabPane, Tabs
 from textual.widgets.tabbed_content import ContentTab
+from textual_tty import Terminal
 from posting.collection import (
     Collection,
     Cookie,
@@ -558,7 +559,7 @@ class MainScreen(Screen[None]):
             targets = {
                 "headers": self.headers_table,
                 "body": self.request_editor.request_body_type_select,
-                "query": self.request_editor.query_editor.query_key_input,
+                "query": self.request_editor.query_editor.query_table,
                 "info": self.request_metadata.request_name_input,
                 "url": self.url_input,
                 "method": self.method_selector,
@@ -864,7 +865,7 @@ class MainScreen(Screen[None]):
         self.url_input.refresh()
 
     def _sync_path_params_from_url(
-        self, preferred_values: dict[str, str] | None = None
+        self, preferred_values: dict[str, str | None] | None = None
     ) -> None:
         """Sync Path tab rows from the URL, preserving values by index.
 
@@ -885,7 +886,8 @@ class MainScreen(Screen[None]):
             # When preferred values are provided (e.g. loading a request),
             # map by name to ensure values follow their placeholders.
             for name in names:
-                values_by_index.append(str(preferred_values.get(name, "")))
+                value = preferred_values.get(name)
+                values_by_index.append("" if value is None else str(value))
         elif table and table.row_count > 0:
             # Otherwise, when editing the current URL, preserve values by index
             # from the existing table rows.
@@ -1021,8 +1023,8 @@ class MainScreen(Screen[None]):
         self.method_selector.value = request_model.method
         self.url_input.value = str(request_model.url)
         self.params_table.replace_all_rows(
-            ((param.name, param.value) for param in request_model.params),
-            (param.enabled for param in request_model.params),
+            ((param.name, param.value or "") for param in request_model.params),
+            (param.enabled and param.value is not None for param in request_model.params),
         )
         # Prefer values from the model, but ensure they align with placeholders in the URL
         preferred_values = {
@@ -1030,11 +1032,16 @@ class MainScreen(Screen[None]):
         }
         self._sync_path_params_from_url(preferred_values)
         # Update URL input highlighter with current path param values
-        self.url_input.highlighter.set_path_params(preferred_values)
+        self.url_input.highlighter.set_path_params(
+            {name: value or "" for name, value in preferred_values.items()}
+        )
         self.url_input.refresh()
         self.headers_table.replace_all_rows(
-            ((header.name, header.value) for header in request_model.headers),
-            (header.enabled for header in request_model.headers),
+            ((header.name, header.value or "") for header in request_model.headers),
+            (
+                header.enabled and header.value is not None
+                for header in request_model.headers
+            ),
         )
         if request_model.body:
             if request_model.body.content:
@@ -1046,10 +1053,13 @@ class MainScreen(Screen[None]):
             elif request_model.body.form_data:
                 self.request_editor.form_editor.replace_all_rows(
                     (
-                        (param.name, param.value)
+                        (param.name, param.value or "")
                         for param in request_model.body.form_data
                     ),
-                    (param.enabled for param in request_model.body.form_data),
+                    (
+                        param.enabled and param.value is not None
+                        for param in request_model.body.form_data
+                    ),
                 )
                 self.request_editor.request_body_type_select.value = "form-body-editor"
                 self.request_body_text_area.text = ""
@@ -1420,6 +1430,15 @@ class Posting(App[None], inherit_bindings=False):
             ),
             handle_leader_action,
         )
+
+    async def _check_bindings(self, key: str, priority: bool = False) -> bool:
+        """Leave the leader key available to embedded terminal applications."""
+        if (
+            key == self.settings.leader
+            and isinstance(self.focused, Terminal)
+        ):
+            return False
+        return await super()._check_bindings(key, priority)
 
     def handle_custom_key(self, event: events.Key) -> bool:
         """Handle shortcuts which must take precedence over focused widgets."""

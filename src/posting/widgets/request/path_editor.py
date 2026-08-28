@@ -1,19 +1,14 @@
 from dataclasses import dataclass
-from textual import on
 from textual.binding import Binding
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
-from textual.widgets import Input
-
-from posting.widgets.input import PostingInput
-from textual.widgets.data_table import RowKey
 
 from posting.collection import PathParam
 from posting.widgets.datatable import PostingDataTable
-from posting.widgets.key_value import KeyValueEditor, KeyValueInput
-from posting.widgets.variable_input import VariableInput
+from posting.widgets.key_value import KeyValueEditor
+from posting.widgets.request.dict_editor import DictEditorWindow
 
 
 class PathParamsTable(PostingDataTable):
@@ -21,6 +16,7 @@ class PathParamsTable(PostingDataTable):
     Table of path parameters extracted from the URL.
 
     Rows are controlled by the URL. Users cannot add or remove rows manually.
+    Press `a` to edit values in a floating Neovim window.
     """
 
     @dataclass
@@ -32,12 +28,6 @@ class PathParamsTable(PostingDataTable):
         def control(self) -> "PathParamsTable":
             return self.editor_table
 
-    BINDINGS = [
-        Binding(
-            "alt+down", "jump_to_url_param", "Jump to param in URL bar", show=False
-        ),
-    ]
-
     def on_mount(self):
         self.fixed_columns = 0
         self.show_header = False
@@ -45,6 +35,26 @@ class PathParamsTable(PostingDataTable):
         self.zebra_stripes = True
         self.row_disable = False
         self.add_columns("Key", "Value")
+
+    BINDINGS = [
+        *PostingDataTable.BINDINGS,
+        Binding(
+            "alt+down", "jump_to_url_param", "Jump to param in URL bar", show=False
+        ),
+        Binding("a", action="open_dict_editor", description="Edit path parameters", show=False),
+    ]
+
+    def action_open_dict_editor(self) -> None:
+        editor = self.query_ancestor(PathParamsEditor)
+        self.app.mount(DictEditorWindow(self, self.as_dict(), editor.apply_mapping, "Edit Path Parameters"))
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            str(row[0].plain if isinstance(row[0], Text) else row[0]): str(
+                row[1].plain if isinstance(row[1], Text) else row[1]
+            )
+            for row in (self.get_row_at(index) for index in range(self.row_count))
+        }
 
     def action_remove_row(self) -> None:
         # Disallow manual row removal.
@@ -72,7 +82,7 @@ class PathParamsTable(PostingDataTable):
             params.append(
                 PathParam(
                     name=row[0].plain if isinstance(row[0], Text) else row[0],
-                    value=row[1].plain if isinstance(row[1], Text) else row[1],
+                    value=(row[1].plain if isinstance(row[1], Text) else row[1]) or None,
                 )
             )
         return params
@@ -95,67 +105,13 @@ class PathParamsEditor(KeyValueEditor):
     def __init__(self) -> None:
         super().__init__(
             PathParamsTable(),
-            KeyValueInput(
-                PostingInput(placeholder="Key", id="path-key-input"),
-                VariableInput(placeholder="Value"),
-                button_label="Update",
-            ),
+            None,
             empty_message=(
                 "[b]No path parameters in URL[/]\n"
                 "Use [$text-accent]:param[/] syntax to add them\n"
                 "e.g. http://example.com/:foo/:bar"
             ),
         )
-        # Disable value input until a row is selected for editing.
-        self.key_value_input.key_input.disabled = True
-        self.key_value_input.value_input.disabled = True
-
-    def on_mount(self) -> None:
-        # Hide the action button unless we're editing a row.
-        self.key_value_input.button.display = False
-
-    @on(KeyValueInput.Change)
-    def add_key_value_pair(self, event: KeyValueInput.Change) -> None:
-        event.stop()
-        event.prevent_default()
-        # Only allow updates to existing rows. Do nothing if no row is selected for editing.
-        if self._row_being_edited is None:
-            return
-
-        # Capture the original key before updating so we can detect a rename.
-        old_key = None
-        if self._row_being_edited_prior_state is not None:
-            old_key = self._row_being_edited_prior_state[0]
-
-        super().add_key_value_pair(event)
-
-        # If the key was renamed, emit a rename event so the URL bar can be updated.
-        if old_key is not None and old_key != event.key:
-            self.post_message(
-                self.PathParamRenamed(old_name=str(old_key), new_name=str(event.key))
-            )
-        params = self._get_params()
-        self.post_message(self.PathParamsUpdated(params))
-
-    def enter_edit_mode(self, row_key: RowKey, focus_value: bool = False) -> None:
-        # Enable both inputs and let the base class decide which to focus based on focus_value.
-        self.key_value_input.key_input.disabled = False
-        self.key_value_input.value_input.disabled = False
-        super().enter_edit_mode(row_key, focus_value=focus_value)
-        # Show the action button while editing.
-        self.key_value_input.button.display = True
-
-    def exit_edit_mode(self, revert: bool = False) -> None:
-        if self._row_being_edited is None:
-            return
-        super().exit_edit_mode(revert)
-        # After exiting edit mode, disable inputs again.
-        self.key_value_input.key_input.disabled = True
-        self.key_value_input.value_input.disabled = True
-        # Hide the action button when not editing.
-        self.key_value_input.button.display = False
-        params = self._get_params()
-        self.post_message(self.PathParamsUpdated(params))
 
     def _get_params(self) -> dict[str, str]:
         params: dict[str, str] = {}
@@ -166,15 +122,23 @@ class PathParamsEditor(KeyValueEditor):
             params[str(key)] = str(val)
         return params
 
+    def apply_mapping(self, values: dict[str, str | None]) -> None:
+        params = {name: value or "" for name, value in values.items()}
+        self.table.replace_all_rows(params.items(), [True] * len(params))
+        self.post_message(self.PathParamsUpdated(params))
+
 
 class PathEditor(Vertical):
     """
     The Path tab which contains the path parameter editor.
     """
 
+    BINDINGS = [
+        Binding("a", action="open_dict_editor", description="Edit path parameters", show=False),
+    ]
+
     def compose(self) -> ComposeResult:
         yield PathParamsEditor()
 
-    @property
-    def path_key_input(self) -> Input:
-        return self.query_one("#path-key-input", Input)
+    def action_open_dict_editor(self) -> None:
+        self.query_one(PathParamsTable).action_open_dict_editor()

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
 
 from textual.command import DiscoveryHit, Hit, Hits, Provider
+from textual.content import Content
 from textual.screen import Screen
 from textual.types import IgnoreReturnCallbackType
 from posting.collection import RequestModel
@@ -44,22 +45,61 @@ class RequestSearchProvider(Provider):
         )
 
     async def search(self, query: str) -> Hits:
-        matcher = self.matcher(query)
+        tokens = query.split()
+        if not tokens:
+            return
+
+        results = []
         for request, path, callback in self.requests:
-            scores = [
-                matcher.match(field)
-                for field in self._search_fields(request, path)
-                if field
-            ]
-            score = max(scores, default=0)
-            if score > 0:
-                yield Hit(
-                    score,
-                    matcher.highlight(request.name),
-                    callback,
-                    text=request.name,
-                    help=path,
+            fields = self._search_fields(request, path)
+            token_matchers = [self.matcher(token) for token in tokens]
+            token_scores = []
+            name_scores = []
+            url_scores = []
+            name = request.name
+            highlighted_name = Content.from_markup(name)
+
+            for matcher in token_matchers:
+                name_score = matcher.match(name)
+                url_score = max(matcher.match(fields[1]), matcher.match(fields[3]))
+                field_score = max(
+                    (matcher.match(field) for field in fields if field),
+                    default=0,
                 )
+                if field_score == 0:
+                    break
+                token_scores.append(field_score)
+                name_scores.append(name_score)
+                url_scores.append(url_score)
+
+                _, offsets = matcher.fuzzy_search.match(matcher.query, name)
+                if name_score > 0:
+                    for offset in offsets:
+                        if not name[offset].isspace():
+                            highlighted_name = highlighted_name.stylize(
+                                matcher.match_style,
+                                offset,
+                                offset + 1,
+                            )
+            else:
+                score = sum(
+                    field_score + (2 * name_score) + url_score
+                    for field_score, name_score, url_score in zip(
+                        token_scores, name_scores, url_scores
+                    )
+                ) / len(token_scores)
+                results.append(
+                    Hit(
+                        score,
+                        highlighted_name,
+                        callback,
+                        text=request.name,
+                        help=path,
+                    )
+                )
+
+        for hit in sorted(results, key=lambda hit: hit.score, reverse=True):
+            yield hit
 
     async def discover(self) -> Hits:
         for request, path, callback in self.requests:

@@ -29,7 +29,11 @@ class FormTable(PostingDataTable):
             form_data.append(
                 FormItem(
                     name=row[0].plain if isinstance(row[0], Text) else row[0],
-                    value=row[1].plain if isinstance(row[1], Text) else row[1],
+                    value=(
+                        row[1].plain if isinstance(row[1], Text) else row[1]
+                    )
+                    if self.is_row_enabled_at(row_index)
+                    else None,
                     enabled=self.is_row_enabled_at(row_index),
                 )
             )

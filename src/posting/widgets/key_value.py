@@ -137,7 +137,7 @@ class KeyValueEditor(Vertical):
     def __init__(
         self,
         table: PostingDataTable,
-        key_value_input: KeyValueInput,
+        key_value_input: KeyValueInput | None,
         empty_message: str = "No entries",
         name: str | None = None,
         id: str | None = None,
@@ -162,7 +162,8 @@ class KeyValueEditor(Vertical):
         self.set_class(self.table.row_count == 0, "empty")
         yield CenterMiddle(Label(self.empty_message), id="empty-message")
         yield self.table
-        yield self.key_value_input
+        if self.key_value_input is not None:
+            yield self.key_value_input
 
     def on_theme_change(self, _) -> None:
         # If a row is being edited we need to refresh the cells that are being edited since they
@@ -173,6 +174,8 @@ class KeyValueEditor(Vertical):
         self.highlight_and_retrieve_row_values(self._row_being_edited)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if self.key_value_input is None and action in {"edit_row", "cancel_edit_row"}:
+            return False
         if action == "cancel_edit_row":
             return self._row_being_edited is not None
         return super().check_action(action, parameters)
@@ -210,7 +213,7 @@ class KeyValueEditor(Vertical):
             self.action_cancel_edit_row()
 
         self.set_class(rows == 0, "empty")
-        if rows == 0 and event.explicit_by_user:
+        if rows == 0 and event.explicit_by_user and self.key_value_input is not None:
             self.key_value_input.key_input.focus()
 
     @on(PostingDataTable.RowsAdded)
@@ -221,6 +224,8 @@ class KeyValueEditor(Vertical):
     @on(PostingDataTable.RowSelected)
     def row_selected(self, event: PostingDataTable.RowSelected) -> None:
         """Switch to edit mode when a row is selected."""
+        if self.key_value_input is None:
+            return
         click_chain = getattr(event, "_click_chain", None)
         if click_chain and click_chain != 2:
             return
@@ -278,6 +283,8 @@ class KeyValueEditor(Vertical):
             self.exit_edit_mode(revert=True)
 
     def enter_edit_mode(self, row_key: RowKey, focus_value: bool = False) -> None:
+        if self.key_value_input is None:
+            return
         # Grab the values from the row that is being edited.
 
         # Take note of the original values of the row, so that we can revert to them if the edit is cancelled.
