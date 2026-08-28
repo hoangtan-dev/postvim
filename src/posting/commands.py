@@ -1,5 +1,6 @@
 from functools import partial
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
 
@@ -116,6 +117,68 @@ def make_request_search_provider(
             super().__init__(screen, requests, match_style)
 
     return BoundRequestSearchProvider
+
+
+class EnvironmentSearchProvider(Provider):
+    """Search environment files from the current collection."""
+
+    def __init__(
+        self,
+        screen: Screen[Any],
+        environment_files: Sequence[tuple[Path, str, Callable[[], None]]],
+        match_style=None,
+    ) -> None:
+        super().__init__(screen, match_style)
+        self.environment_files = tuple(
+            sorted(environment_files, key=lambda entry: entry[0].name.lower())
+        )
+
+    async def search(self, query: str) -> Hits:
+        tokens = query.split()
+        results = []
+        for path, relative_path, callback in self.environment_files:
+            fields = (path.name, relative_path)
+            if tokens:
+                matchers = [self.matcher(token) for token in tokens]
+                scores = []
+                for matcher in matchers:
+                    score = max((matcher.match(field) for field in fields), default=0)
+                    if score == 0:
+                        break
+                    scores.append(score)
+                else:
+                    results.append(
+                        Hit(
+                            sum(scores) / len(scores),
+                            Content.from_markup(path.name),
+                            callback,
+                            text=path.name,
+                            help=relative_path,
+                        )
+                    )
+            else:
+                results.append(
+                    DiscoveryHit(path.name, callback, help=relative_path)
+                )
+
+        for result in sorted(
+            results,
+            key=lambda hit: getattr(hit, "score", 0),
+            reverse=True,
+        ):
+            yield result
+
+
+def make_environment_search_provider(
+    environment_files: Sequence[tuple[Path, str, Callable[[], None]]],
+) -> type[EnvironmentSearchProvider]:
+    """Bind environment files to a provider class for CommandPalette."""
+
+    class BoundEnvironmentSearchProvider(EnvironmentSearchProvider):
+        def __init__(self, screen, match_style=None) -> None:
+            super().__init__(screen, environment_files, match_style)
+
+    return BoundEnvironmentSearchProvider
 
 
 class PostingProvider(Provider):

@@ -3,6 +3,7 @@ import json
 from contextlib import redirect_stdout, redirect_stderr
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -45,7 +46,11 @@ from posting.collection import (
     RequestModel,
 )
 
-from posting.commands import PostingProvider, make_request_search_provider
+from posting.commands import (
+    PostingProvider,
+    make_environment_search_provider,
+    make_request_search_provider,
+)
 from posting.config import SETTINGS, Settings
 from posting.jump_overlay import JumpOverlay
 from posting.jumper import Jumper
@@ -1414,6 +1419,10 @@ class Posting(App[None], inherit_bindings=False):
         def handle_leader_action(action: str | None) -> None:
             if action == "search":
                 self.main_screen.action_open_request_search_palette()
+            elif action == "environment_picker":
+                self.action_open_environment_picker()
+            elif action == "environment_edit":
+                self.action_edit_environment()
             elif action == "send":
                 self.main_screen.send_via_worker()
             elif action == "yank_curl":
@@ -1424,6 +1433,8 @@ class Posting(App[None], inherit_bindings=False):
                 self.settings.leader,
                 {
                     (self.settings.leader,): "search",
+                    ("e", "p"): "environment_picker",
+                    ("e", "e"): "environment_edit",
                     ("r",): "send",
                     ("y", "c"): "yank_curl",
                 },
@@ -1646,6 +1657,85 @@ class Posting(App[None], inherit_bindings=False):
 
     def command_toggle_spacing(self) -> None:
         self.spacing = "compact" if self.spacing == "standard" else "standard"
+
+    def action_open_environment_picker(self) -> None:
+        """Open a picker for environment files in the collection."""
+        environment_directory = self.collection.path / "envs"
+        if not environment_directory.is_dir():
+            self.notify(
+                f"Environment directory not found: {environment_directory}",
+                severity="error",
+            )
+            return
+
+        environment_files = [
+            path
+            for path in sorted(environment_directory.iterdir())
+            if path.is_file()
+        ]
+        if not environment_files:
+            self.notify(
+                f"No environment files found in: {environment_directory}",
+                severity="warning",
+            )
+            return
+
+        collection_path = self.collection.path
+        entries = [
+            (
+                path,
+                str(path.relative_to(collection_path)),
+                lambda path=path: self._load_selected_environment(path),
+            )
+            for path in environment_files
+        ]
+        self.push_screen(
+            CommandPalette(
+                providers=[make_environment_search_provider(entries)],
+                placeholder="Select an environment file…",
+                id="environment-picker",
+            )
+        )
+
+    def _load_selected_environment(self, path: Path) -> None:
+        from posting.widgets.load_env_file_dialog import load_env_file
+
+        load_env_file(self, path)
+
+    def action_edit_environment(self) -> None:
+        """Open the current environment file in the configured native editor."""
+        if not self.environment_files:
+            self.notify(
+                "No environment file is currently loaded.",
+                severity="warning",
+            )
+            return
+
+        editor = self.settings.editor
+        if not editor:
+            self.notify(
+                severity="warning",
+                title="No editor configured",
+                message="Set the [b]$EDITOR[/b] environment variable.",
+            )
+            return
+
+        current_file = self.environment_files[0]
+        editor_args = shlex.split(editor)
+        editor_args.append(str(current_file))
+
+        with self.suspend():
+            try:
+                subprocess.call(editor_args)
+            except OSError:
+                self.notify(
+                    severity="error",
+                    title="Can't run editor",
+                    message=f"The command [b]{editor}[/b] failed to run.",
+                )
+                return
+
+        self._load_selected_environment(current_file)
 
     def action_open_web_docs(self) -> None:
         import webbrowser

@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -203,9 +204,55 @@ def test_load_env_file_updates_app_state_and_variables(tmp_path) -> None:
     assert loaded is True
     assert app.environment_files == (env_file.resolve(),)
     assert published == [None]
-    assert notifications == [(f"Loaded environment from: {env_file.resolve()}", None)]
+    assert notifications == []
     assert get_variables()["FROM_FILE"] == "1"
     assert get_variables()["FROM_SESSION"] == "2"
+
+
+def test_load_env_file_restarts_environment_watcher(tmp_path) -> None:
+    env_file = tmp_path / "watched.env"
+    env_file.write_text("WATCHED=1\n", encoding="utf-8")
+    watcher_calls: list[None] = []
+    app = SimpleNamespace(
+        environment_files=(),
+        settings=SimpleNamespace(use_host_environment=False, watch_env_files=True),
+        session_env={},
+        env_changed_signal=SimpleNamespace(publish=lambda _: None),
+        watch_environment_files=lambda: watcher_calls.append(None),
+        notify=lambda *args, **kwargs: None,
+    )
+
+    assert load_env_file(app, env_file) is True
+    assert watcher_calls == [None]
+
+
+def test_edit_environment_uses_current_file_and_native_editor(
+    tmp_path, monkeypatch
+) -> None:
+    env_file = tmp_path / "env.local"
+    env_file.write_text("EDITED=1\n", encoding="utf-8")
+    editor_calls: list[list[str]] = []
+    loaded: list[Path] = []
+
+    import posting.app as posting_app
+
+    monkeypatch.setattr(
+        posting_app.subprocess,
+        "call",
+        lambda args: editor_calls.append(args) or 0,
+    )
+    app = SimpleNamespace(
+        environment_files=(env_file, tmp_path / "base.env"),
+        settings=SimpleNamespace(editor="nvim --clean"),
+        suspend=lambda: nullcontext(),
+        _load_selected_environment=lambda path: loaded.append(path),
+        notify=lambda *args, **kwargs: None,
+    )
+
+    posting_app.Posting.action_edit_environment(app)
+
+    assert editor_calls == [["nvim", "--clean", str(env_file)]]
+    assert loaded == [env_file]
 
 
 def test_make_posting_reloads_env_variables_even_when_cache_is_populated(tmp_path) -> None:

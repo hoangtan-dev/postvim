@@ -64,7 +64,8 @@ def load_env_file(
     )
     update_variables(app.session_env)
     app.env_changed_signal.publish(None)
-    app.notify(f"Loaded environment from: {resolved_path}")
+    if getattr(app.settings, "watch_env_files", False):
+        app.watch_environment_files()
     return True
 
 
